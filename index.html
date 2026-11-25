@@ -901,7 +901,7 @@ const INTRO=1,OUTRO=3;
 /* ---------- music ---------- */
 const AUD={buf:null,blob:null,name:'',ctx:null,tried:false};
 const getACtx=()=>AUD.ctx||(AUD.ctx=new (window.AudioContext||window.webkitAudioContext)());
-function decodeAudio(ab){return new Promise((res,rej)=>{try{const p=getACtx().decodeAudioData(ab,res,rej);if(p&&p.then)p.then(res,rej)}catch(e){rej(e)}})}
+function decodeAudio(ab){return new Promise((res,rej)=>{try{const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext,dc=new OAC(2,1,48000);const p=dc.decodeAudioData(ab,res,rej);if(p&&p.then)p.then(res,rej)}catch(e){rej(e)}})}
 async function loadDefaultAudio(){
  if(AUD.buf||AUD.tried)return;AUD.tried=true;
  for(const f of['dwarf.mp3','dawrf.mp3']){
@@ -1020,7 +1020,7 @@ function renderFrame(x,S,player,T,fin,intro,oc){
 async function encodeMp4(tl,intro,job,prog,oc,audio){
  const base={width:W,height:H,bitrate:Math.round(W*H*3.2),framerate:30,avc:{format:'avc'}};
  let cfg=null;
- for(const codec of['avc1.640028','avc1.4d0028','avc1.42e028','avc1.42001f']){try{const r=await VideoEncoder.isConfigSupported({...base,codec});if(r&&r.supported){cfg=r.config||{...base,codec};break}}catch(e){}}
+ for(const hw of['prefer-hardware','no-preference'])for(const codec of['avc1.640028','avc1.4d0028','avc1.42e028','avc1.42001f']){if(cfg)break;try{const r=await VideoEncoder.isConfigSupported({...base,codec,hardwareAcceleration:hw});if(r&&r.supported)cfg=r.config||{...base,codec,hardwareAcceleration:hw}}catch(e){}}
  if(!cfg)return null;
  const target=new Mp4Muxer.ArrayBufferTarget();
  const mopt={target,video:{codec:'avc',width:W,height:H,frameRate:30},fastStart:'in-memory',firstTimestampBehavior:'offset'};
@@ -1071,6 +1071,7 @@ async function recordLive(tl,intro,job,prog,oc,mix){
  try{rec.state!=='inactive'&&rec.stop()}catch(e){}
  await Promise.race([stopped,sleep(4000)]);
  if(asrc)try{asrc.stop()}catch(e){}
+ if(AUD.ctx){try{AUD.ctx.close()}catch(e){}AUD.ctx=null;job.actx=null}
  stream.getTracks().forEach(t=>t.stop());
  if(job.cancel)return'cancel';
  if(!chunks.length)return null;
